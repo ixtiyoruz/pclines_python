@@ -50,13 +50,13 @@ def diamond_vanish(lines, Normalization, SpaceSize, VanishNumber, imshape=[512,5
         
         # get lines close to VP
         # we are giving lines as n x 3 
-        print(np.shape(lines))
+#        print(np.shape(lines))
         distance = point_to_lines_dist(result["PC_VanP_Norm"][v,:], lines[:,0:3])
         # remove lines
         args= np.where(distance < threshold)[0]
-        print('before lines shape = ', np.shape(lines), np.shape(args))
+#        print('before lines shape = ', np.shape(lines), np.shape(args))
         lines = np.delete(lines, args, 0)
-        print('after lines shape = ', np.shape(lines), np.shape(args))
+#        print('after lines shape = ', np.shape(lines), np.shape(args))
         
         
     result["CC_VanP"] = PC_point_to_CC(Normalization, result["PC_VanP_Norm"], imshape)
@@ -74,7 +74,7 @@ def PC_point_to_CC(normalization, vanishpc, imgshape):
     
     reg = np.where(abs(normvanishcc[:,2]) > 0.005)[0]
     noreg = np.where(abs(normvanishcc[:,2]) <= 0.005)[0]
-    print(np.shape(abs(normvanishcc[:,2]) ),reg, noreg)
+#    print(np.shape(abs(normvanishcc[:,2]) ),reg, noreg)
 #    if(len(reg) > 0):
     normvanishcc[reg, :] = np.apply_along_axis(np.divide, 0, normvanishcc[reg,:], normvanishcc[reg,2])
     if(len(noreg)> 0):
@@ -105,8 +105,8 @@ def point_to_lines_dist(Point, Lines):
     lines are n x 3 format
     """
     
-    print(Point)
-    print(np.shape(Lines))
+#    print(Point)
+#    print(np.shape(Lines))
     
     x = Point[0]
     y = Point[1]
@@ -146,6 +146,7 @@ def pad_with(vector, pad_width, iaxis, kwargs):
 
 def find_maximum(space, R):
     r,c = np.where(np.max(space) == space)
+#    print(r, c)
     S = np.pad(space, (R,R), pad_with, padder=0)
     
     

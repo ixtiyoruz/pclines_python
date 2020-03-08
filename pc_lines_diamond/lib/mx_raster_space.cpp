@@ -108,8 +108,8 @@ void lines_end_points(float * line, int * endpoints, float space_c, int numLines
         float a_x = alpha*a / (c + gamma*a);
         float b_x = -alpha*c / (c + gamma*a);
 
-        end[1] = round((a_x + 1) * space_c);
-        end[0] = round((b_x + 1) * space_c);
+        end[1] = round((a_x + 1) * space_c); //that is why the output is always positive or zero
+        end[0] = round((b_x + 1) * space_c); 
 
         end[3] = round((b / (c + beta*b) + 1) * space_c);
         end[2] = center;

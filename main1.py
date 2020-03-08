@@ -14,6 +14,7 @@ import random
 #from common import anorm2, draw_str
 from pylsd import lsd
 import matplotlib.pyplot as plt
+from pc_lines_diamond.mx_lines import  fit_ellipse, gety,get_coeffs
 #from pclines import params, denoise_lanes
 #parameters to change
 lk_params = dict( winSize  = (15, 15),
@@ -46,7 +47,19 @@ def draw_hough_line(accumulator, thetas, rhos):
     fig.clf()
 #    plt.show()
     return X
+def twoPoints2Polar(line):
+    p1 = np.array(line[0])
+    p2 = np.array(line[1])
+    # Compute 'rho' and 'theta'
+    rho = abs(p2[0]*p1[1] - p2[1]*p1[0]) / cv.norm(p2 - p1);
+    theta = -np.arctan2((p2[0] - p1[0]) , (p2[1] - p1[1]));
 
+    # You can have a negative distance from the center 
+    # when the angle is negative
+    if (theta < 0):
+        rho = -rho;
+
+    return rho, theta
 class App:
     def __init__(self, video_src):
         # parameters to change
@@ -182,30 +195,37 @@ class App:
                     cv.polylines(vis, np.int32([self.tracks[i]]), False, (0, 0, 255))
                 else:
                     cv.polylines(vis, np.int32([self.tracks[i]]), False, (255, 0, 0))
-                for j in range(len(self.tracks[i])):
-                    for t_idx in np.arange(0,num_thetas, 5):
-                        
-                        x = self.tracks[i][j][0]
-                        y = self.tracks[i][j][1]
-                        
-                        # Calculate rho. diag_len is added for a positive index
-                        rho = round(x * cos_t[t_idx] + y * sin_t[t_idx]) + diag_len
-                        
-                        if(diff_ys < 0):
-                            accumulator1[int(rho), int(t_idx)] += 1
-                        else:
-                            accumulator2[int(rho), int(t_idx)] += 1
+#                for j in range(len(self.tracks[i])):
+#                    for t_idx in np.arange(0,num_thetas, 5):
+#                print(np.shape(self.tracks[i]))
+                a,b,c = get_coeffs(np.array(self.tracks[i]))
+                xs = [-width,width-1]
+                ys= [gety(xs[0], a,b,c),gety(xs[1], a,b,c)]
+                rho, theta = twoPoints2Polar([[xs[0], ys[0]], [xs[1], ys[1]]])
+#                        m = (ys[1] - ys[0]) / (xs[1] - xs[0])
+#                        theta = np.arctan2()
+#                        x = self.tracks[i][j][0]
+#                        y = self.tracks[i][j][1]
+                
+                # Calculate rho. diag_len is added for a positive index
+#                        rho = round(x * cos_t[t_idx] + y * sin_t[t_idx]) + diag_len
+                rho = rho + diag_len
+                print(rho, theta)
+                if(diff_ys < 0):
+                    accumulator1[int(rho), int(theta)] += 1
+                else:
+                    accumulator2[int(rho), int(theta)] += 1
                             
             
 #            hough_image = draw_hough_line(accumulator1,thetas, rhos )
 #            hough_image2 = draw_hough_line(accumulator2,thetas, rhos )
             
             points_acc1 = self.take_n_best_lanes(accumulator1, thetas, rhos, n = 1)
-#            for i in range(len(points_acc1)):
-#                cv.line( vis, points_acc1[i][0], points_acc1[i][1], (122,0,255), 2, 8 );
+            for i in range(len(points_acc1)):
+                cv.line( vis, points_acc1[i][0], points_acc1[i][1], (122,0,255), 2, 8 );
             points_acc2 = self.take_n_best_lanes(accumulator2, thetas, rhos, n = 1)
-#            for i in range(len(points_acc1)):
-#                cv.line( vis, points_acc2[i][0], points_acc2[i][1], (255,0,122), 2, 8 );
+            for i in range(len(points_acc1)):
+                cv.line( vis, points_acc2[i][0], points_acc2[i][1], (255,0,122), 2, 8 );
 
             x_int, y_int= self.line_intersection_point(points_acc1[0], points_acc2[0])
             if(not x_int == None):
@@ -229,10 +249,10 @@ class App:
                 break
 
 def main():
-    videos_root = '/media/ixtiyor/New Volume/datasets/auto_callibration/d1'
-    videos = os.listdir(videos_root)
+#    videos_root = '/media/ixtiyor/New Volume/datasets/auto_callibration/d1'
+#    videos = os.listdir(videos_root)
     try:
-        video_src = videos_root + "/" + videos[10]
+        video_src = "GOPR2036_half.mp4" #videos_root + "/" + videos[10]
     except:
         video_src = 0
 

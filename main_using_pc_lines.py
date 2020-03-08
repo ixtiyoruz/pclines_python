@@ -12,9 +12,10 @@ import cv2
 import os
 import math
 #from common import anorm2, draw_str
-from pclines_point_alignment import params, detect_vps_given_lines
+from pclines_point_alignment import params#, detect_vps_given_lines
 # parameters to change
 from pc_lines_diamond.diamond_vanish import diamond_vanish
+from pc_lines_diamond.mx_lines import  fit_ellipse, gety,get_coeffs
 class App:
     def __init__(self, video_src):
         # parameters to change
@@ -106,17 +107,31 @@ class App:
                         my_tr = np.array(tr)                    
                         with warnings.catch_warnings():
                             warnings.simplefilter('ignore', np.RankWarning)
-                            p = np.poly1d(np.polyfit(my_tr[:,0],my_tr[:,1],1))
+#                            print(repr(my_tr))
+                            a,b,c = get_coeffs(my_tr)
+#                            b, a, _,_ = fit_ellipse(my_tr,[])
+#                            j = np.mean(my_tr[:, 1])
+#                            i = np.mean(my_tr[:, 0])
+#                            print('lines = ', a,b,c)
+#                            norm = max(width, height) - 22  
+#                            h_c = (height - 1)/2
+#                            w_c = (width - 1) / 2
+#                            c = j#-b *  (i-h_c)/norm - a * (j - w_c)/ norm
+                            xs = [-width,width-1]
+                            ys= [gety(xs[0], a,b,c),gety(xs[1], a,b,c)]
+#                            p = np.poly1d(np.polyfit(my_tr[:,0],my_tr[:,1],1))
 #                            print('polyfitted', p.)
                             # make line that goes to infinity, in our case it is image boundary
     #                        print('line eq', p)
     #                        print('coefficients', np.polyfit(my_tr[:,0],my_tr[:,1], 1))..
     #                        print('line',[0, p(0),511, p(-511)])
-                            new_lines.append([0, p(0), 511, p(511)])
+                            new_lines.append([xs[0], ys[0], xs[1], ys[1]])
                             # a, b, c, w
                             # p[0], 1, p[1], 1
-                            new_line_coeffs.append([p.c[0], -1, p.c[1], 1])
-#                            cv2.line( vis, (0, int(p(0))), (511, int(p(511))), (255,0,122), 2, 8 );
+#                            new_line_coeffs.append([p.c[0], -1, p.c[1], 1])
+                            new_line_coeffs.append([a, b, c, 1])
+                            print('coefffs', new_line_coeffs[-1])
+                            cv2.line( vis, (xs[0], int(ys[0])), (xs[1], int(ys[1])), (255,0,122), 2, 8 );
                     new_tracks.append(tr)
                     
                     if self.frame_idx % self.detect_interval == 0:
@@ -130,10 +145,10 @@ class App:
             if self.frame_idx % self.detect_interval == 0:
                 if(len(self.track_lines)>0):
 #                    _, self.points_staright_old,self.points_twisted_old =  detect_vps_given_lines(frame_gray,self.prms,np.array(self.track_lines), vis,self.points_staright_old,self.points_twisted_old)
-                    
-                    result = diamond_vanish(np.array(self.track_lines_coeffs), 0.4, 100,1, [self.prms.h,self.prms.w])
+#                    print('line coeffs = \n', repr(self.track_lines_coeffs))
+                    result = diamond_vanish(np.array(self.track_lines_coeffs), 1.0, 100,1, [self.prms.h,self.prms.w])
                     resvps = np.int32(abs(result["CC_VanP"]))
-                    print("detected vp =====", resvps)
+#                    print("detected vp =====", resvps)
                     for i in range(len(resvps)):
                         cv2.circle(vis, (resvps[i][0], resvps[i][1]), 5, self.track_circle_color, -1)
                     
@@ -159,10 +174,10 @@ class App:
                 break
 
 def main():
-    videos_root = '/media/ixtiyor/New Volume/datasets/auto_callibration/d1'
-    videos = os.listdir(videos_root)
+#    videos_root = '/media/ixtiyor/New Volume/datasets/auto_callibration/d1'
+#    videos = os.listdir(videos_root)
     try:
-        video_src = videos_root + "/" + videos[1]
+        video_src = "GOPR2036_half.mp4"#videos_root + "/" + videos[1]
     except:
         video_src = 0
 
