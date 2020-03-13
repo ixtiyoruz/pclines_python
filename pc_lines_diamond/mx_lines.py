@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from sklearn import linear_model
 from pc_lines_diamond.ransac.ransac import *
 
+
 def augment(xys):
     axy = np.ones((len(xys), 3))
     axy[:, :2] = xys
@@ -46,48 +47,59 @@ def is_inlier(coeffs, xy, threshold):
 #        # fit ellipse
         
 
-def fit_ellipse(results, distances):
+def fit_ellipse(results):
+    """
+    results are N x X, Y ,d 
+    where d is distance
+    """
     good_ellipse = True
-    vec_data = np.zeros((4))
+    vec_data = None
 #    dist = 1 
 #    while(good_ellipse):
-    cov_data = np.zeros((3))
-    x_mean = 0
-    y_mean = 0
     
-#        size = 0
-    for i in range(len(results)):
-        x_mean  = x_mean + results[i][0]
-        y_mean = y_mean + results[i][1]
-    x_mean = x_mean/len(results)
-    y_mean = y_mean/len(results)
-    xx = 0
-    yy= 0
-    xy = 0
+    dist = results[-1][2]
     
-    for i in range(len(results)):
-        x = results[i][0]- x_mean
-        y = results[i][1] - y_mean
-        xx =xx + x* x
-        yy = yy + y * y
-        xy = xy + x * y
-
-    cov_data[0] = xx/ len(results)
-    cov_data[1] = yy/ len(results)
-    cov_data[2] = xy/ len(results)
-    cov = np.array([[cov_data[0], cov_data[2]],
-            [cov_data[2], cov_data[1]]])
-    _,vec_data,_ =  np.linalg.svd(cov)
+    while(good_ellipse and dist>0):
+        cov_data = np.zeros((3))
+        x_mean = 0
+        y_mean = 0
+        size = 0
+        for i in range(len(results)):
+            if(results[i][2] > dist): break
+            x_mean  = x_mean + results[i][0]
+            y_mean = y_mean + results[i][1]
+            size = size +1
+        x_mean = x_mean/size
+        y_mean = y_mean/size
+        xx = 0
+        yy= 0
+        xy = 0
+        
+        for i in range(len(results)):
+            if(results[i][2] > dist): break
+            x = results[i][0]- x_mean
+            y = results[i][1] - y_mean
+            xx =xx + x* x
+            yy = yy + y * y
+            xy = xy + x * y
+    
+        cov_data[0] = xx/ (size -1)
+        cov_data[1] = yy/ (size -1)
+        cov_data[2] = xy/ (size -1)
+#        cov = np.array([[cov_data[0], cov_data[2]],
+#                [cov_data[2], cov_data[1]]])
+        vec_data, good_ellipse = eigens(cov_data)
+#        _,vec_data,_ =  np.linalg.svd(cov)
 #        print(good_ellipse)
     return vec_data
 
 def eigens(cov_data):
-#    ellipse_threshold = 1
+    ellipse_threshold = 1
     vec_data = np.zeros((4))
-#    trace = cov_data[0] + cov_data[2]
-#    det = cov_data[0] * cov_data[2]  - cov_data[1] - cov_data[1]
-#    s = np.sqrt(trace * trace /4 -det)
-#    vals_data = np.array([trace/2 -s, trace/2 + s])
+    trace = cov_data[0] + cov_data[2]
+    det = cov_data[0] * cov_data[2]  - cov_data[1] - cov_data[1]
+    s = np.sqrt(trace * trace /4 -det)
+    vals_data = np.array([trace/2 -s, trace/2 + s])
     
     if(abs(cov_data[1]) > 0.001):
         vec_data[0] = vec_data[0] - cov_data[2]
@@ -102,12 +114,34 @@ def eigens(cov_data):
     vec_data[2] = vec_data[1]
     vec_data[3] = -vec_data[0]
     
-#    print(vals_data, vals_data[1]/vals_data[0] < ellipse_threshold)
-    return vec_data
+    print(vals_data[1]/vals_data[0], vals_data[1]/vals_data[0] < ellipse_threshold)
+    return vec_data, False#vals_data[1]/vals_data[0] < ellipse_threshold
 
-
-   
-#
+#def run_fitting(points, width, height, rads,padding=22):
+#    """
+#    
+#    width and height is belong to original image
+#    points are 4 valued array, x1,y1,x2,y2
+#    
+#    """
+#    width = width + 2 * padding
+#    height = height + 2 * height
+#    
+#    patch_size = rads[-1] * 2 +1
+#    dist = np.zeros([patch_size, patch_size])
+#    for i in range(patch_size):
+#        for j in range(patch_size):
+#            dist[i, j] = max(abs(i - rads[-1]),abs(j - rads[-1]))
+#    w_c = (width -1)/2
+#    h_c = (height-1)/2
+#    norm = (max(w_c, h_c) - rads[-1])
+#    
+#    for i in range(len(points)):
+#        ix = (points[i][2] -points[i][0])/2
+#        iy = (points[i][1] - points[1][0])/2
+#        m_point = [ix, iy, dist[]]
+#        fit_ell
+##
 #    
 #points = np.array([( 0 , 3),
 #    ( 1 , 2),
@@ -153,10 +187,10 @@ def get_coeffs(points):
 #    D =  np.c_[xt, yt]
     goal_inliers = len(points)
     max_iterations = 3
-    m, b  = run_ransac(points, estimate, lambda x, y: is_inlier(x, y, 0.1), goal_inliers, max_iterations, 20)
+    m, b,new_points  = run_ransac(points, estimate, lambda x, y: is_inlier(x, y, 0.1), goal_inliers, max_iterations, 20)
 #    print(m)
     a,b,c = m
-    c = -b * np.average(points[:,1]) - a *np.average(points[:,0])
+    c = -b * new_points[0][1] - a * new_points[0][0]
     return a,b,c
 
 
@@ -168,23 +202,25 @@ def gety(x, a,b,c):
 if __name__ == '__main__':
     
    
-    points =  np.array([[270.89157, 303.38962],
-       [272.86075, 312.51575],
-       [275.07196, 322.43488],
-       [277.3726 , 333.2462 ],
-       [280.0113 , 344.9997 ],
-       [282.73657, 357.89746]])
+#    points =  np.array([[270.89157, 303.38962,1],
+#       [272.86075, 312.51575,1],])
+    points = np.array([[0,0, 50,50], [399,0,50,50]])
     #plt.show()
 
     #n = np.argmax(np.abs(E))
     #a = V[:,n]
     
 #    U, S, V = np.linalg.svd()
-    a,b,c =get_coeffs(points)
+    a,b,c =get_coeffs(points[:,0:2])
     
     
     
-    #a, b = fit_ellipse(points,[])
+#    b, a,_,_ = fit_ellipse(points)
+#    c = -a * points[0][0]  - b*points[0][1]
+#    a=a/b
+#    c = c/b
+#    b = b/b
+    
     #points_hom = np.c_[points[:, 0],points[:, 1], np.ones(len(points))]
     #u,s, v = 
     width = 512
@@ -195,7 +231,7 @@ if __name__ == '__main__':
 #    j = np.mean(points[:, 1])
 #    i = np.mean(points[:, 0])
 #    c = -b * np.average(y) - a *np.average(x)
-    xs = [0,311]
+    xs = [250,311]
     
 #    ransac = linear_model.RANSACRegressor()
     ys= [gety(xs[0], a, b, c),gety(xs[1], a, b, c)]

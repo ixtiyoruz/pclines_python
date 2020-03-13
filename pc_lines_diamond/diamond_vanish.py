@@ -1,13 +1,23 @@
 # -*- coding: utf-8 -*-
 import functools
 import numpy as np
-from .raster_space import use_raster_space
+from pc_lines_diamond.raster_space import use_raster_space
+from pc_lines_diamond.mx_lines_import import use_mx_lines
 import math
+import cv2
 # there is a problem with sign function in python so this is a workaround
 # https://stackoverflow.com/questions/1986152/why-doesnt-python-have-a-sign-function
 sign = functools.partial(math.copysign, 1)
-
-def diamond_vanish(lines, Normalization, SpaceSize, VanishNumber, imshape=[512,512]):
+def auto_canny(image, sigma=0.43):
+	# compute the median of the single channel pixel intensities
+	v = np.median(image)
+	# apply automatic Canny edge detection using the computed median
+	lower = int(max(0, (1.0 - sigma) * v))
+	upper = int(min(255, (1.0 + sigma) * v))
+	edged = cv2.Canny(image, lower, upper)
+	# return the edged image
+	return edged
+def diamond_vanish(image,  Normalization, SpaceSize, VanishNumber,oldspace = []):
     """
         Detection of vanishing point using diamond space
         input:
@@ -25,44 +35,168 @@ def diamond_vanish(lines, Normalization, SpaceSize, VanishNumber, imshape=[512,5
             Results.PC_VanP_Norm  normalized position of the maxima (R.Space bounded from -1 to 1)
             Results.CC_VanP       position of the vanishing point in the input image coordinates
     """
-    
-    # i do not understand how this may help ???
-    lines[:,3] =lines[:,3] #* Normalization
-    
-    subpixelradius = 2
-    threshold = 0.05
+#    VanishNumber = 3
+#    Normalization = 0.4
+#    SpaceSize = 321
+#    image = np.zeros((400, 400,3), np.uint8);
+#    for i in range(400):
+#        if(i>250):
+#            image[i  , i,:] = [0,0,255]
+#            image[i  , 400-i-1,:] = [0,0,255]
     result = {}#{'Space':[], 'PC_VanP':[],'PC_VanP_Norm':[],'CC_VanP':[]}
     result['PC_VanP'] = np.zeros([VanishNumber, 2])
     result["PC_VanP_Norm"] = np.zeros([VanishNumber, 2])
+    result["CC_VanP"] = np.zeros([1, 2])
+    patches = np.array(np.arange(6, 26, 4), np.int32)
+#    if(len(lines) == 0):
+    edges = auto_canny(np.array(image,np.uint8), 0.1)#cv2.Canny(np.array(image,np.uint8))
+#    edges = cv2.Canny(np.array(image,np.uint8), 0, 255, 3, L2gradient=False)
     
+    edges = np.int32(edges/255)
+#    
+#    edges = np.uint8(edge)
+#    image = np.uint8(img*255)
+    edgest = np.pad(edges, (patches[-1],patches[-1]), pad_with, padder=0)
+    res,len_lines = use_mx_lines(edgest.ravel(),edgest.shape[0],edgest.shape[1], patches, len(patches))
+#        if(len_lines <= 0):
+#            return result,[], edges
+    lines  = np.array_split(res, len_lines, axis=0)
+    lines = np.array(lines)
+#    if(len(oldlines)> 0):
+#        lines = np.r_[lines,oldlines]
+    
+    # i do not understand how this may help ???
+    lines[:,2] =(lines[:,2])* Normalization
+    returning_lines = lines
+    
+    subpixelradius = 2
+    threshold = 0.05
+    
+    
+#    v = 0
+    for v in range(VanishNumber):
+        print(np.shape(lines))
+        space = use_raster_space(lines.ravel(), [SpaceSize,SpaceSize],len(lines))
+        
+        space = np.reshape(space , (SpaceSize, SpaceSize)).T
+#        if(not len(oldspace) == 0):
+#            space = space + oldspace
+    #        print(np.shape(find_maximum(space, subpixelradius)))
+        if(v==0):
+            result["Space"] = space 
+        result['PC_VanP'][v,:] = find_maximum(space, subpixelradius)
+        
+#        result["Space"] = space
+        result["PC_VanP_Norm"][v,:] =  normalize_PC_points(result['PC_VanP'][v,:], SpaceSize)
+        
+#         get lines close to VP
+#         we are giving lines as n x 3 
+#        print(np.shape(lines))
+        distance = point_to_lines_dist(result["PC_VanP_Norm"][v,:], lines[:,0:3]) # shu method da xato bor 
+#         remove lines
+        args= np.where(distance < threshold)[0]
+#        print('before lines shape = ', np.shape(lines), np.shape(args))
+         
+        lines = np.delete(lines, args, 0)
+#        print('after lines shape = ', np.shape(lines), np.shape(args))
+#        
+        
+    result["CC_VanP"] = PC_point_to_CC(Normalization, result["PC_VanP_Norm"], image.shape[:-1]) 
+#    resvps = np.int32(abs(result["CC_VanP"]))
+#        print("detected vp =====", resvps)
+#    try:
+#    for i in range(len(resvps[resvps[:,0] >0])):
+#        cv2.circle(image, (resvps[i][0], resvps[i][1]), 5, [0,0,255], -1)
+##    except:
+##        pass
+#    cv2.imshow("edges", np.float32(edges * 255))
+#    cv2.imshow('grey', image)
+#    ch = cv2.waitKey(0)
+#    cv2.destroyAllWindows()
+#    print(result["CC_VanP"])
+    return result, returning_lines, edges
+def diamond_vanish_with_lines(lines,width, height,  Normalization, SpaceSize, VanishNumber,oldspace = []):
+    """
+        Detection of vanishing point using diamond space
+        input:
+            lines           float array;
+                            shape [a,b,c,w] x n, where ax + by + c = 0
+                            if we use np.polyfit, then b is always 1, we cannot go back
+            normalization   float number;
+                            normlalization of the image (1 means normalization from -1 to 1)
+            SpaceSize       int number;
+                            resulution of the accumulation space (final space has dims SpaceSize x SpaceSize)
+        output:
+            Results structure with fields:
+            Results.Space         accumulated diamond space (further is used for orthogonalization)
+            Results.PC_VanP       positions of the maxima in R.Space
+            Results.PC_VanP_Norm  normalized position of the maxima (R.Space bounded from -1 to 1)
+            Results.CC_VanP       position of the vanishing point in the input image coordinates
+    """
+#    VanishNumber = 1
+#    Normalization = 0.4
+#    SpaceSize = 321
+#    width = 400
+#    height = 400
+#    image = np.zeros((400, 400,3), np.uint8);
+#    for i in range(400):
+#        if(i<159):
+#            image[i  , i,:] = [255,255,255]
+#            image[i  , 400-i-1,:] = [255,255,255]
+    result = {}#{'Space':[], 'PC_VanP':[],'PC_VanP_Norm':[],'CC_VanP':[]}
+    result['PC_VanP'] = np.zeros([VanishNumber, 2])
+    result["PC_VanP_Norm"] = np.zeros([VanishNumber, 2])
+    result["CC_VanP"] = np.zeros([1, 2])
+#    print(type(lines))
+    lines[:,2] =lines[:,2]* Normalization
+    
+    subpixelradius = 2
+    threshold = 0.05
+    
+    
+#    v = 0
     for v in range(VanishNumber):
 #        print(np.shape(lines))
         space = use_raster_space(lines.ravel(), [SpaceSize,SpaceSize],len(lines))
-    
-        space = np.reshape(space , (SpaceSize, SpaceSize))
-#        print(np.shape(find_maximum(space, subpixelradius)))
-        if(v>0):
-            space += result["Space"] 
+        
+        space = np.reshape(space , (SpaceSize, SpaceSize)).T
+        if(len(space[0])>0 and len(oldspace) != 0):
+                space = space + oldspace
+#        print(np.shape(space))
+        if(v==0):
+            result["Space"] = space 
         result['PC_VanP'][v,:] = find_maximum(space, subpixelradius)
         
-        result["Space"] = space
+#        result["Space"] = space
         result["PC_VanP_Norm"][v,:] =  normalize_PC_points(result['PC_VanP'][v,:], SpaceSize)
         
-        # get lines close to VP
-        # we are giving lines as n x 3 
+#         get lines close to VP
+#         we are giving lines as n x 3 
 #        print(np.shape(lines))
-        distance = point_to_lines_dist(result["PC_VanP_Norm"][v,:], lines[:,0:3])
-        # remove lines
+        distance = point_to_lines_dist(result["PC_VanP_Norm"][v,:], lines[:,0:3]) # shu method da xato bor 
+#         remove lines
         args= np.where(distance < threshold)[0]
 #        print('before lines shape = ', np.shape(lines), np.shape(args))
+         
         lines = np.delete(lines, args, 0)
 #        print('after lines shape = ', np.shape(lines), np.shape(args))
+#        
         
-        
-    result["CC_VanP"] = PC_point_to_CC(Normalization, result["PC_VanP_Norm"], imshape)
-    
+    result["CC_VanP"] = PC_point_to_CC(Normalization, result["PC_VanP_Norm"], [height,width ]) 
+#    resvps = np.int32(abs(result["CC_VanP"]))-1
+#        print("detected vp =====", resvps)
+#    try:
+#    for i in range(len(resvps)):
+#        cv2.circle(image, (resvps[i][0], resvps[i][1]), 5, [255,255,255], -1)
+#    except:
+#        pass
+#    cv2.imshow("edges", np.float32(edges * 255))
+#    cv2.imshow('grey', image)
+#    ch = cv2.waitKey(0)
+#    cv2.destroyAllWindows()
 #    print(result["CC_VanP"])
     return result
+
 def PC_point_to_CC(normalization, vanishpc, imgshape):
     u = vanishpc[:, 0]
     v = vanishpc[:, 1]
@@ -136,6 +270,7 @@ def point_to_lines_dist(Point, Lines):
     return D
     
 def normalize_PC_points(VanP, spacesize):
+    VanP = np.array(VanP) + 1
     normvp = (2*VanP - (spacesize+1))/(spacesize-1)
     return normvp
 

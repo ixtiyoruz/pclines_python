@@ -1,6 +1,8 @@
-#include "mex.h"
 #include <list>
-
+#include <stdio.h>
+//#include <stdlib.h>
+#include <cstdlib>
+#include <cmath>
 #define ELLIPSE_THRESH 32
 
 //neighborhoods
@@ -17,7 +19,7 @@ struct line_param
     float b;
     float c;
     float w;
-    line_param::line_param(float _a,float _b, float _c, float _w):a(_a),b(_b),c(_c),w(_w){}
+    line_param(float _a,float _b, float _c, float _w):a(_a),b(_b),c(_c),w(_w){}
 };
 
 struct coords
@@ -25,84 +27,116 @@ struct coords
     int x;
     int y;
     int d;
-    coords::coords(int _x,int _y, int _d):x(_x),y(_y),d(_d){}
+    coords(int _x,int _y, int _d):x(_x),y(_y),d(_d){}
 };
 
 std::list<coords> floodFill(int *data, int cx, int cy, int img_height, int * rads, int rads_size, int * v_steps, int * dist);
 int fit_ellipse(std::list<coords> & results, float * vec_data);
 int eigens(float * cov_data, float * vec_data);
 
-void mexFunction(int nlhs, mxArray * plhs[], int nrhs, const mxArray * prhs[])
+extern "C" void mexFunction(int * data, int width, int height, int * rads, int rads_size,float ** mx_lines_data, int * lines_num);
+void mexFunction(int * data, int width, int height, int * rads, int rads_size, float ** mx_lines_data, int * lines_num)
 {
+//    printf("entered edgelet content first 10:\n");
+//    for(int i =0;i < height;i++){
+//        for(int j = 0;j< width;j++){
+//            printf("%d ", data[i * height + j]);
+//        }
+//        printf("\n");
+//    }
+//    printf("\n");
     //init matrix
-    int * data = (int*)mxGetData(prhs[0]); 
+//    int * data = (int*)mxGetData(prhs[0]); 
       
-    int width = int(mxGetN(prhs[0]));
-    int height = int(mxGetM(prhs[0]));
+//    int width = int(mxGetN(prhs[0]));
+//    int height = int(mxGetM(prhs[0]));
     
     //rings radius
-    int * rads = (int*)mxGetData(prhs[1]); 
-    int rads_size = int(mxGetN(prhs[1]));
+//    int * rads = (int*)mxGetData(prhs[1]); 
+//    int rads_size = int(mxGetN(prhs[1]));
+//    printf("getting patch size\n");
     int patch_size = rads[rads_size-1]*2 + 1;
-  
+//    printf("patch size %d", patch_size);
+//    printf("vseps initialization\n");
     //v_step for faster indexing
+    
     int * v_steps = (int*)malloc(sizeof(int)*patch_size);
     for(int i = 0; i < patch_size; i++) 
         v_steps[i] = i*patch_size;
-
+    
+//    printf("initializing dist array\n");
     //mask with distances
     int * dist = (int*)malloc(sizeof(int)*patch_size*patch_size);
-    for(int i=0; i<patch_size; i++)
-    for(int j=0; j<patch_size; j++)
-        dist[v_steps[i] + j] = max(abs(i-rads[rads_size-1]), abs(j-rads[rads_size-1]));
-        
+//    printf("distances:::\n");
+    for(int i=0; i<patch_size; i++){
+        for(int j=0; j<patch_size; j++){
+            dist[v_steps[i] + j] = max(abs(i-rads[rads_size-1]), abs(j-rads[rads_size-1]));
+//            printf("%d ", dist[v_steps[i] + j]);
+        }
+//        printf("\n");
+    }
+//    printf("\n");
     std::list<line_param> lines; 
     
     //normalize values
     float w_c = (width - 1)/2.f;
     float h_c = (height - 1)/2.f;
     float norm = (max(w_c, h_c) - rads[rads_size-1]);
-    
+//    printf("wc h_c norm %f %f %f \n", w_c, h_c, norm);
     float vec_data[4];
+//    printf('')
+//    printf("main process started\n");
     //for each edge point in image with padds
     for(int i=rads[rads_size-1]; i <  width - rads[rads_size-1]; i++)
     for(int j=rads[rads_size-1]; j <  height - rads[rads_size-1]; j++)
     {
+//        printf('')
         if (data[i * height + j] == 1)
         {
+//        printf("flood fill \n");
+//            printf("starting to find lines\n");
             //call flood fill with array of rings radius    
             std::list<coords> results = floodFill(data, i, j, height, rads, rads_size, v_steps, dist);
-  	
+//          	printf("starting to fit an ellipse\n");
+//            printf("fitt ellipse\n");
             //fit ellipse
             if(fit_ellipse(results, vec_data) == 1)
             {
                 //push if ok                
                 float c = -vec_data[0]*((j - h_c)/norm) - vec_data[1]*((i - w_c)/norm); 
+//                printf("line params %f, %f, %f \n", vec_data[1], vec_data[0], c);
                 lines.push_back(line_param(vec_data[1], vec_data[0], c, 1.f));      
             }
         }  
     }
-   
-    int lines_size[2] = {4, lines.size()};
-    mxArray * mx_lines = mxCreateNumericArray(2, lines_size, mxSINGLE_CLASS, mxREAL);
-    float * mx_lines_data = (float*)mxGetData(mx_lines); 
+//    printf("main process is finished\n");
     
+//    printf("mxlines initializatino\n");
+//    int lines_size[2] = {4, lines.size()};
+//    mxArray * mx_lines = mxCreateNumericArray(2, lines_size, mxSINGLE_CLASS, mxREAL);
+//    float * mx_lines_data = (float*)mxGetData(mx_lines); 
+   
+    float * mx_lines = (float*)malloc(sizeof(float) * 4 * lines.size());
     int c = 0;
     for (std::list<line_param>::iterator it = lines.begin(); it!=lines.end(); ++it, c++)
     {
-        mx_lines_data[c*4] = it->a;               
-        mx_lines_data[c*4 + 1] = it->b;               
-        mx_lines_data[c*4 + 2] = it->c;
-        mx_lines_data[c*4 + 3] = it->w;
+        mx_lines[c*4] = it->a;               
+        mx_lines[c*4 + 1] = it->b;               
+        mx_lines[c*4 + 2] = it->c;
+        mx_lines[c*4 + 3] = it->w;
     }
-    
-    plhs[0] = mx_lines;
+    *mx_lines_data = mx_lines;
+    //plhs[0] = mx_lines;
     //free(labData);
     //plhs[0] = idx;
-    
+    int num_lines_temp= lines.size();
+//    printf("returning lines num = %d \n",num_lines_temp);
+    *lines_num = lines.size();
+//    printf("freeing vsteps and dist\n");
     free(v_steps);
     free(dist);    
 }
+
 
 std::list<coords> floodFill(int *data, int cx, int cy, int img_height, int * rads, int rads_size, int * v_steps, int * dist)
 {   
@@ -115,6 +149,14 @@ std::list<coords> floodFill(int *data, int cx, int cy, int img_height, int * rad
     
     int * labels = (int*)calloc(patch_size*patch_size, sizeof(int));        
     int * hist = (int*)calloc(radius+1, sizeof(int));
+//    printf("radius %d\n",radius );
+//    printf("patch_size %d\n",patch_size);
+//    printf("hist first 100:\n");
+//    for(int i =0;i < 10;i++){
+//         printf("%d ", hist[i]);
+//     }   
+//     printf("\n");
+    
     hist[0] = 1;
     
     int eque_min = 0;

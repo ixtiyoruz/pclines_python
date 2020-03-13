@@ -9,6 +9,7 @@ import numpy as np
 #     sys.exit()
 
 try:
+    print('importing mx_raster_space')
     mylib = ctypes.CDLL("./pc_lines_diamond/lib/mx_raster_space.so")
 except OSError:
     
@@ -39,7 +40,7 @@ def use_raster_space(linesData, space_size, numlines):
 #    mexFunction1()
     mexFunction_fync(linesData_c, space_size_c, num_lines_c, byref(out_d_c))
     return [out_d_c[i] for i in range(space_size[0] * space_size[1])]
-
+#
 
 def getdata():
     ac = np.random.randint(0, 10, [100, 2])
@@ -49,6 +50,6 @@ def getdata():
 
 if __name__ =="__main__":
     lines, nlines = getdata()
-    print(lines[:, :10])
-    res = use_raster_space(lines.T.ravel(), [100, 100], nlines)
-    print(res[:10])
+#    print(lines[:, :10])
+    res = use_raster_space(lines.T.ravel(), [321, 321], nlines)
+#    print(res[:10])

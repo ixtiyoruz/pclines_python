@@ -1,7 +1,8 @@
-#include "math.h"
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <cstdlib>
+#include <cmath>
+#include <string.h>
 void lines_end_points(float * line, int * endpoints, float space_c, int numLines);
 void rasterize_lines(float * line, int * endpoints, int * space, int SpaceSize, int numLines);
 inline void lineH(int x0, int y0, int x1, int y1, int * space, int * y_steps, int weight);
@@ -23,10 +24,10 @@ int round(float x)
 extern "C" void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace_out);
 void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace_out)
 {
-    printf("SpaceSize= %d ,%d\n",SpaceSize[0] , SpaceSize[1] );
-    printf("numLines= %d\n",numLines);
-    int * pSpace = (int*) malloc(sizeof(int) * SpaceSize[0] * SpaceSize[1]);
-    
+//    printf("newSpaceSize= %d ,%d\n",SpaceSize[0] , SpaceSize[1] );
+//    printf("numLines= %d\n",numLines);
+    int * pSpace = new int[SpaceSize[0] * SpaceSize[1]]();//(int*) malloc(sizeof(int) * SpaceSize[0] * SpaceSize[1]);
+//    memset(pSpace, 0, sizeof(pSpace));
     //Get Lines data
     float space_c = (SpaceSize[0] - 1.f)/2;
 
@@ -35,23 +36,49 @@ void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace
     //int * EndPoints = (int*)mxGetData(mxE); 
     int * EndPoints =  (int*) malloc(sizeof(int)*8*numLines);
 //    printf("endpoints allocated\n");
+    
+//    
+//    printf("contents of LinesData 12 ta\n");
+//    for(int i = 0; i < 12; i++)
+//    {
+//        printf("%f ",LinesData[i]);
+//    }
+//    
+//    printf("getting all line endpoints\n");
     //Get all EndPoints
     lines_end_points(LinesData, EndPoints, space_c, numLines);
+    
+    
+    
+//    
 //    printf("lines end points found \n");
-    //Rasterize
+//    printf("ouput contents before\n");
+//    for(int i = 0; i < 10; i++)
+//    {
+//        printf("%d ",pSpace[i]);
+//    }
+    
+//    printf("rasterize lines started\n");
+//    Rasterize
     rasterize_lines(LinesData, EndPoints, pSpace, SpaceSize[0], numLines);
+    
+//    printf("freeing endpoints\n");
 //    printf("rasterize lines finishied \n");
     free(EndPoints);
 //    printf("ouput contents \n");
 //    for(int i = 0; i < 10; i++)
 //    {
-//        for(int j = 0; j < SpaceSize[1]; i++)
-//        {
-//            printf("%d ",pSpace[i]);
+//        printf("%d ",pSpace[i]);
+//    }
+//    printf("returning data\n");
+    *pSpace_out = pSpace;
+//    for(int i =0;i < SpaceSize[0];i++){
+//        for(int j = 0;j < SpaceSize[1];j++){
+//            printf("%d ",pSpace[i * SpaceSize[1] + j]);
 //        }
 //        printf("\n");
 //    }
-    *pSpace_out = pSpace;
+//       printf("\n");
 }
 
 void rasterize_lines(float * line, int * endpoints, int * space, int cSpaceSize, int numLines)
@@ -78,7 +105,7 @@ void rasterize_lines(float * line, int * endpoints, int * space, int cSpaceSize,
 //                printf("inner loop linev finished \n");
                 }
             else{
-//                printf("inner loop lineH started \n");
+//                printf("inner loop lineH started with values x1=%d, y1=%d x2=%d,y2=%d\n", end[j], end[j+1], end[j+2], end[j+3]);
                 lineH(end[j], end[j+1], end[j+2], end[j+3], space, v_steps, weight);        
 //                printf("inner loop lineH finished \n");
             }
@@ -87,6 +114,7 @@ void rasterize_lines(float * line, int * endpoints, int * space, int cSpaceSize,
         space[v_steps[end[7]] + end[6]] += weight;
 //        printf("loop weight added end\n");
     }
+//    printf("freeing vsteps in rasterize lines method \n");
     free(v_steps);
 }
 
@@ -124,8 +152,11 @@ void lines_end_points(float * line, int * endpoints, float space_c, int numLines
 
 inline void lineH(int x0, int y0, int x1, int y1, int * space, int * y_steps, int weight)
 {
+//    printf(" line h started\n");
+//    printf("getting the slope\n");
     float slope = (float)(y1 - y0)/(x1 - x0);
 
+    
 	//float y_iter = y0 + 0.5f;     
     float y_start = y0 + 0.5f; 
     float y_iter = y_start;
@@ -133,8 +164,10 @@ inline void lineH(int x0, int y0, int x1, int y1, int * space, int * y_steps, in
     int step = (x0 < x1) ? 1 : -1;
     slope *= step;
     
+    
     for(int x = x0, c = 1; x != x1; x+=step, c++)
 	{   
+//    	printf("line h inner loop from x0=%d to x1=%d, curr x = %d\n",x0,x1,x);
         space[y_steps[int(y_iter)] + x] += weight;        
         //y_iter += slope;		  		
         y_iter = y_start + c*slope;

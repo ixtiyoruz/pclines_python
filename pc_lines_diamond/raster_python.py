@@ -2,6 +2,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
+import cv2
+from pc_lines_diamond.raster_space import use_raster_space
 def newline(p1, p2):
     ax = plt.gca()
     xmin, xmax = ax.get_xbound()
@@ -57,7 +59,7 @@ def rasterize_lines(lines, endpoints, space_c):
         weight = lines[i][3]
         for j in np.arange(0,3,1):
             end = endpoints[i]       
-            print('end = ', end)
+#            print('end = ', end)
             if(abs(end[j+1][1]-end[j][1]) > abs(end[j+1][0]-end[j][0])):
                 diamond_space = lineV(end[j], end[j+1], diamond_space, weight)
             else:
@@ -80,7 +82,7 @@ def lineH(endpoint0, endpoint1, space, weight):
 #    c=1
     print('line H is started')
     for x in np.arange(endpoint0[0],endpoint1[0],step):
-         print(y_iter, int(x))
+#         print(y_iter, int(x))
          space[int(y_iter), x]  = space[int(y_iter), x] + weight
          y_iter = y_start +  slope
 #         c = c+ 1
@@ -96,9 +98,9 @@ def lineV(endpoint0, endpoint1, space, weight):
     if(endpoint0[1] < endpoint1[1]):
         step = 1
     slope = slope * step
-    print('line V is started')
+#    print('line V is started')
     for y in np.arange(endpoint0[1], endpoint1[1], step):
-        print(y, int(x_iter), endpoint0[1], endpoint1[1])
+#        print(y, int(x_iter), endpoint0[1], endpoint1[1])
         space[y, int(x_iter)] = space[y, int(x_iter)] + weight
         x_iter = x_iter + slope
     return space
@@ -110,10 +112,10 @@ def PC_point_to_CC(normalization, vanishpc, imgshape):
    
 #    print(np.sign(v) * v + np.sign(u) * u - 1)
     normvanishcc = np.c_[v, np.sign(v) * v + np.sign(u) * u - 1, u]
-    print(normvanishcc)
+#    print(normvanishcc)
     reg = np.where(abs(normvanishcc[:,2]) > 0.005)[0]
     noreg = np.where(abs(normvanishcc[:,2]) <= 0.005)[0]
-    print(np.shape(abs(normvanishcc[:,2]) ),reg, noreg)
+#    print(np.shape(abs(normvanishcc[:,2]) ),reg, noreg)
 #    if(len(reg) > 0):
     normvanishcc[reg, :] = np.apply_along_axis(np.divide, 0, normvanishcc[reg,:], normvanishcc[reg,2])
     if(len(noreg)> 0):
@@ -170,9 +172,9 @@ def normr(data):
 #    int
 
 def get_lines():
-    return np.array([[-0.004672157173030971, 0.0007278492438751731, 1.000185782554909, 1],
-                     [-0.0064745343598747425, 0.005371113732867811, 0.9998361655578181, 1],
-                      [-0.0078103358529136024, 0.00802232783350351, 1.0000238153878616, 1]])
+    return np.array([[0.1, 0.2,0.03, 1],
+                     [0.1, 0.2,0.33, 1],
+                      [0.1, 0.2,0.43, 1]])
 
 if __name__ == "__main__":
 #    test line is x + 2 where full written form is
@@ -186,12 +188,12 @@ if __name__ == "__main__":
         pys = [pxs[0]*a + c, pxs[1] * a + c]
         axs.plot(pxs, pys,'k-')
     plt.show()
-    
+#    
     fig, axs = plt.subplots(1, figsize=(10,10))
-    space_size = 521
-    
+    space_size = 321
+#    
     resall = []
-    space = np.zeros((space_size, space_size,3), np.uint8)
+#    space = np.zeros((space_size, space_size,3), np.uint8)
     for i in range(len(lines)):
         res = convert_line_to_pc_line_endpoint(lines[i], (space_size-1.0)/2)
         axs.plot(res[0:2,0], res[0:2,1],'k-')
@@ -201,29 +203,35 @@ if __name__ == "__main__":
         resall.append(res)
         color = (255, 0, 0)
 #        cv2.polylines(space, np.uint8(res.reshape((-1, 1, 2))), False, color, -1) 
-        space = space+ cv2.polylines(np.zeros((space_size, space_size,3), np.uint8), np.int32([res]), False, (1,0,0))
-#    space = rasterize_lines(np.array(lines), np.int32(resall), space_size)
+#        space = space+ cv2.polylines(np.zeros((space_size, space_size,3), np.uint8), np.int32([res]), False, (1,0,0))
+    space = rasterize_lines(np.array(lines), np.int32(resall), space_size)
+    
+    space1 = use_raster_space(lines.ravel(), [space_size,space_size],len(lines))
+    space1 = np.reshape(space1 , (space_size, space_size)).T
 #    diamond_space[np.int32(res[:,0]), np.int32(res[:,1])] = diamond_space[np.int32(res[:,0]), np.int32(res[:,1])] + 1
 #    diamond_space[np.int32(res1[:,0]), np.int32(res1[:,1])] = diamond_space[np.int32(res1[:,0]), np.int32(res1[:,1])] + 1
-    plt.show()
-    space = cv2.rectangle(space, (roi[0], roi[1]), (roi[0]+roi[2], roi[1]+roi[3]), color, linewidth)
-    find_maximum(img,2)
-#    fig, ax = plt.subplots(figsize=(10,10))
-#    ax.imshow(space, interpolation='nearest')
-#    plt.tight_layout()
 #    plt.show()
-#    vp = find_maximum(space, 2)
-##    vp.reverse()
-#    vp = np.array([vp])
-#    vp_cc = PC_point_to_CC(1.0, vp, [512,512])
-import cv2
-#space[space>0] = 1
-img = space[:, :, 0]
-img[img>0] = 255
-img = cv2.resize(img, (512,512))
-cv2.imshow("img", img)
-cv2.waitKey(0)
-cv2.destroyAllWindows()
+#    space = cv2.rectangle(space, (roi[0], roi[1]), (roi[0]+roi[2], roi[1]+roi[3]), color, linewidth)
+#    find_maximum(img,2)
+    fig, ax = plt.subplots(figsize=(10,10))
+    ax.imshow(space1, interpolation='nearest')
+    plt.tight_layout()
+    plt.show()
+    
+    fig, ax = plt.subplots(figsize=(10,10))
+    ax.imshow(space, interpolation='nearest')
+    plt.tight_layout()
+    plt.show()
+
+
+#import cv2
+##space[space>0] = 1
+#img = space[:, :, 0]
+#img[img>0] = 255
+#img = cv2.resize(img, (512,512))
+#cv2.imshow("img", img)
+#cv2.waitKey(0)
+#cv2.destroyAllWindows()
 #   
 #points = np.array([( 0 , 3),
 #    ( 1 , 2),
