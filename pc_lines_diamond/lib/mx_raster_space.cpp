@@ -24,6 +24,8 @@ int round(float x)
 extern "C" void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace_out);
 void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace_out)
 {
+
+
 //    printf("newSpaceSize= %d ,%d\n",SpaceSize[0] , SpaceSize[1] );
 //    printf("numLines= %d\n",numLines);
     int * pSpace = new int[SpaceSize[0] * SpaceSize[1]]();//(int*) malloc(sizeof(int) * SpaceSize[0] * SpaceSize[1]);
@@ -79,6 +81,7 @@ void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace
 //        printf("\n");
 //    }
 //       printf("\n");
+    free(pSpace); // first pointer must be released
 }
 
 void rasterize_lines(float * line, int * endpoints, int * space, int cSpaceSize, int numLines)

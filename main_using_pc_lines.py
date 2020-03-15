@@ -50,6 +50,7 @@ class App:
         self.space_old_moving_edges = [] # for second vanishing point
         self.vp_1 = [] # first vanishing pooint
         self.vp_2 = [] # second vanishing pooint
+        self.vp_1_unchanged_life_count  = 0
     def take_lane_towards_horizon(self,point1, length=30):
         xdiff_1 = (point1[0] - self.vp_1[0])
         ydiff_1 = (point1[1] - self.vp_1[1])
@@ -105,7 +106,7 @@ class App:
 #                frame[i  , i,:] = [0,0,255]
 #                frame[i  , 400-i-1,:] = [0,0,255]
         _ret, frame = self.cam.read()
-        frame = cv2.resize(frame, (512,512 ))
+        frame = cv2.resize(frame, (1024,512 ))
         width = frame.shape[1]
         height = frame.shape[0]
         self.prms = params(width, height)
@@ -114,6 +115,7 @@ class App:
             _ret, frame = self.cam.read()
             frame = cv2.resize(frame, (width,height ))
             frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            edges = np.zeros_like(frame)
             
             #vis = np.zeros(frame.shape, np.uint8)                                                                        
             if len(self.tracks) > 0:
@@ -160,67 +162,89 @@ class App:
                 self.tracks = new_tracks
                 self.track_lines = new_lines
                 self.track_lines_coeffs = new_line_coeffs
-            if self.frame_idx % self.detect_interval == 0:
+            if(self.vp_1_unchanged_life_count > 290):
                 sobelx = cv2.Sobel(frame_gray,cv2.CV_64F,1,0,ksize=7)
                 sobely = cv2.Sobel(frame_gray,cv2.CV_64F,0,1,ksize=7)
                 magnitude = cv2.magnitude(sobelx, sobely) # computes sqrt(xi^2 + yi^2)
                 phase = cv2.phase(sobelx,sobely,angleInDegrees=True) # computes angel between x and y
                 
-                H = get_orientation_matrix_way(magnitude, phase,1.0,8)
+                H = get_orientation_matrix_way(magnitude, phase,0.3,8)
                 
                 if(len(self.B) == 0):
                     self.B = H
                 else:
                     self.B = self.alpha * self.B + (1-self.alpha) * H
                 
-                H = background_test(self.B, H)
+                H = background_test(self.B, H, t2 = 40000,t1=30000)
                 H = np.sum(H,2)
                 H = (H/np.max(H) * 255).astype('uint8')
-                moving_lines= cv2.HoughLinesP(H,3,np.pi/180, 20, minLineLength=5,maxLineGap=1) 
-                cv2.imshow('edges', H)
+            if(self.vp_1_unchanged_life_count > 300):
+                moving_lines= cv2.HoughLinesP(H,1,np.pi/180, 1, minLineLength=8,maxLineGap=3) 
+                
                 if(moving_lines is not None):
                     for line in moving_lines:
+                        
                         x1,y1,x2,y2 = line[0]
-                        cv2.line(frame,(x1,y1),(x2,y2),(0,255,0),2)
+                        cv2.line(edges,(x1,y1),(x2,y2),(0,255,255),2)
+                    
                     new_moving_line_coeffs = []
                     for i in range(len(moving_lines)):
                         x1,y1,x2,y2 = moving_lines[i][0]
-                        degree = 90
-                        if(len(self.vp_1) > 0):
-                            lt_vp1 = [self.vp_1[0] - x1, self.vp_1[1] - y1]
-                            lt_cur_line = [x2-x1,y2-y1]
-                            rad = np.arccos(np.dot(lt_cur_line, lt_vp1)/ ((np.sqrt(np.dot(lt_cur_line,lt_cur_line))) * np.sqrt(np.dot(lt_vp1, lt_vp1))))
-                            degree = rad * 180 / np.pi
-#                            print('between angle is', degree)
-                        degree_threshold = 60
-                        if(degree > degree_threshold and degree < 180-degree_threshold):
-                            m, b,new_points  = run_ransac(np.array([[x1,y1],[x2,y2]]), estimate, lambda x, y: is_inlier(x, y, 0.1), 2, 3, 2, 20)
-                        
-                            if(m is None):
-                                continue
-                            a,b,c = m
-                            corig = -a * new_points[0][0] - b * new_points[0][1]
-                            c = get_diamond_c_from_original_coords(new_points[0][0]-22,new_points[0][1]-22,a,b,self.prms.w,self.prms.h)
-                            coeffs = [a,b,c,1]#[a/b,b/b,c/b,1/b]#[a,b,c,1]#[a/b,b/b,c/b,1/b]
-                            new_moving_line_coeffs.append(coeffs)
+                        if(y1 >= 0.5 *self.prms.h and y2 >= 0.5 * self.prms.h):
+                            degree = 90
+                            if(len(self.vp_1) > 0):
+                                
+                                lt_vp1 = [self.vp_1[0] - x1, self.vp_1[1] - y1]
+                                lt_cur_line = [x2-x1,y2-y1]
+                                rad = np.arccos(np.dot(lt_cur_line, lt_vp1)/ ((np.sqrt(np.dot(lt_cur_line,lt_cur_line))) * np.sqrt(np.dot(lt_vp1, lt_vp1))))
+                                degree = rad * 180 / np.pi
+        #                            print('between angle is', degree)
+                            degree_threshold = 60
+                            if(degree > degree_threshold and degree < 180-degree_threshold):
+                                m, b,new_points  = run_ransac(np.array([[x1,y1],[x2,y2]]), estimate, lambda x, y: is_inlier(x, y, 0.1), 2, 3, 2, 20)
                             
-                            xs = [-width, width]
-                            ys= [gety(xs[0], a,b,corig),gety(xs[1], a,b,corig)]
-        #                        print(ys)
-                            try:
-                                cv2.line( vis, (xs[0], int(ys[0])), (xs[1], int(ys[1])), (0,255,255), 2, 8 );        
-                            except:pass
+                                if(m is None):
+                                    continue
+                                a,b,c = m
+                                corig = -a * new_points[0][0] - b * new_points[0][1]
+                                c = get_diamond_c_from_original_coords(new_points[0][0]-22,new_points[0][1]-22,a,b,self.prms.w,self.prms.h)
+                                coeffs = [a,b,c,1]#[a/b,b/b,c/b,1/b]#[a,b,c,1]#[a/b,b/b,c/b,1/b]
+                                new_moving_line_coeffs.append(coeffs)
+                                
+                                xs = [-width, width]
+                                ys= [gety(xs[0], a,b,corig),gety(xs[1], a,b,corig)]
+            #                        print(ys)
+                                try:
+                                    cv2.line( vis, (xs[0], int(ys[0])), (xs[1], int(ys[1])), (0,255,255), 2, 8 );        
+                                except:pass
                     self.moving_line_coeffs = new_moving_line_coeffs
                 if(len(self.moving_line_coeffs) > 0):
                     result_moving_edges = diamond_vanish_with_lines(np.array(self.moving_line_coeffs), self.prms.w,self.prms.h,0.4, 321,1,self.space_old_moving_edges)
                     self.space_old_moving_edges = result_moving_edges["Space"]
                     resvps_moving_edges = np.int32(abs(result_moving_edges["CC_VanP"]))
                     self.vp_2  = resvps_moving_edges[0] - 1
+                    for i in range(len(resvps_moving_edges)):
+                        if(resvps_moving_edges[i][0] > 0 and resvps_moving_edges[i][1] > 0):
+                            cv2.circle(vis, (resvps_moving_edges[i][0]-1, resvps_moving_edges[i][1]-1), 5, self.track_circle_color, -1)
+                
+                    
                     print("detected vp =====", self.vp_2)
+            if self.frame_idx % self.detect_interval == 0 and self.vp_1_unchanged_life_count <=300 :
+               
                 if(len(self.track_lines_coeffs) > 0):
                     result = diamond_vanish_with_lines(np.array(self.track_lines_coeffs), self.prms.w,self.prms.h,0.4, 321,1,self.space_old)
                     self.space_old = result["Space"]
                     resvps = np.int32(abs(result["CC_VanP"]))
+                    if(len(self.vp_1) > 0):
+                        
+                        if(np.all((resvps[0] - 1) == self.vp_1)):
+                            self.vp_1_unchanged_life_count  = self.vp_1_unchanged_life_count + 1
+#                            print('unchanged ', self.vp_1_unchanged_life_count)
+                        else:
+#                            if(self.vp_1_unchanged_life_count != 0):
+                                self.vp_1_unchanged_life_count  =0 #self.vp_1_unchanged_life_count - 1
+#                            print('unchanged ', self.vp_1_unchanged_life_count)
+                            
                     self.vp_1  = resvps[0] - 1
 #                    print("detected vp =====", resvps)
 #                    print(np.max(self.space_old))
@@ -240,16 +264,17 @@ class App:
 
                 for i in range(len(self.tracks)):
                     cv2.polylines(vis, np.int32([self.tracks[i]]), False, self.track_line_color)
-                if(len(self.vp_1) > 0 and len(self.vp_2) > 0):
-                    for i in range(10):
-                        random.seed(i)
-                        line1, line2 = self.take_lane_towards_horizon((randrange(width), randrange(height)), length=30)
-                        cv2.arrowedLine(vis, line1[1], line1[0]  , (0,0,255), 2, 8)
-                        cv2.arrowedLine(vis, line2[1],  line2[0], (255,0,0), 2, 8)
+            if(len(self.vp_1) > 0 and len(self.vp_2) > 0):
+                for i in range(10):
+                    random.seed(i)
+                    line1, line2 = self.take_lane_towards_horizon((randrange(width), randrange(height)), length=30)
+                    cv2.arrowedLine(vis, line1[1], line1[0]  , (0,0,255), 2, 8)
+                    cv2.arrowedLine(vis, line2[1],  line2[0], (255,0,0), 2, 8)
             
             self.frame_idx += 1
             self.prev_gray = frame_gray
-            cv2.imshow('lk_track', vis)
+            cv2.imshow('img', vis)
+#            cv2.imshow('edges', edges)
 #            cv2.imshow("edges", np.float32(edges * 255))
             
             ch = cv2.waitKey(1)
@@ -258,11 +283,11 @@ class App:
         
 
 def main():
-    videos_root = '/media/ixtiyor/New Volume/datasets/auto_callibration/d1'
-    videos = os.listdir(videos_root)
+#    videos_root = '/media/ixtiyor/New Volume/datasets/auto_callibration/d1'
+#    videos = os.listdir(videos_root)
     try:
-        video_src =videos_root + "/" + videos[0] # "GOPR2036_half.mp4"
-    except:
+        video_src = "GOPR2036_half.mp4" # videos_root + "/" + videos[0] 
+    except: 
         video_src = 0
 
     App(video_src).run()
@@ -271,8 +296,6 @@ def main():
     
 if __name__ == "__main__":
     main()
-
- 
 
 """
         import gc
