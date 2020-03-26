@@ -1,7 +1,7 @@
 # pclines_python
 that famous pclines in python
 
-Here are you can find implementation of three papers:
+Here, you can find implementation of three papers:
 
 1. http://www.fit.vutbr.cz/research/groups/graph/pclines/pub_page.php?id=2013-BMVC-VanPoints
 2. http://www.fit.vutbr.cz/research/groups/graph/pclines/pub_page.php?id=2014-ITS-MotionVanPoints
