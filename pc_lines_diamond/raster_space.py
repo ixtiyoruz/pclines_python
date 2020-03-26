@@ -1,13 +1,14 @@
 import sys, platform
 import ctypes, ctypes.util
-from ctypes import POINTER, c_double, c_int,byref, c_float, c_int8
+from ctypes import POINTER, c_double, c_int,byref, c_float, c_int8,CDLL
 import numpy as np
+from ctypes.util import find_library
 # mylib_path = ctypes.util.find_library("./mylib.so")
 
 # if not mylib_path:
 #     print("Unable to find the specified library.")
 #     sys.exit()
-
+libc = CDLL(find_library("c"))
 try:
     print('importing mx_raster_space')
     mylib = ctypes.CDLL("./pc_lines_diamond/lib/mx_raster_space.so")
@@ -25,6 +26,9 @@ mexFunction_fync = mylib.mexFunction
 mexFunction_fync.argtypes= [POINTER(c_float), POINTER(c_int), c_int, POINTER(POINTER(c_int))]
 #void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace_out)
 
+free_int_fync = mylib.free_int_array
+free_int_fync.argtypes = [POINTER(POINTER(c_int))]
+
 #mexFunction1 = mylib.mexFunction1
 def use_raster_space(linesData, space_size, numlines):
     linesData_d = np.array(linesData, np.float32)
@@ -39,7 +43,11 @@ def use_raster_space(linesData, space_size, numlines):
     
 #    mexFunction1()
     mexFunction_fync(linesData_c, space_size_c, num_lines_c, byref(out_d_c))
-    return [out_d_c[i] for i in range(space_size[0] * space_size[1])]
+    result = [out_d_c[i] for i in range(space_size[0] * space_size[1])]
+    libc.free(out_d_c)
+    
+#    free_int_fync(byref(out_d_c));
+    return result
 #
 
 def getdata():

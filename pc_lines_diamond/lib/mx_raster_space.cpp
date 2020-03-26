@@ -21,6 +21,12 @@ int round(float x)
 //void mexFunction1(){
 //    printf("\nspaceSize should be two dim array size1111111111\n\n");
 //}
+extern "C" void free_int_array(int **input);
+void free_int_array(int ** input)
+{
+    free(input);
+}
+
 extern "C" void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace_out);
 void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace_out)
 {
@@ -29,6 +35,7 @@ void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace
 //    printf("newSpaceSize= %d ,%d\n",SpaceSize[0] , SpaceSize[1] );
 //    printf("numLines= %d\n",numLines);
     int * pSpace = new int[SpaceSize[0] * SpaceSize[1]]();//(int*) malloc(sizeof(int) * SpaceSize[0] * SpaceSize[1]);
+    
 //    memset(pSpace, 0, sizeof(pSpace));
     //Get Lines data
     float space_c = (SpaceSize[0] - 1.f)/2;
@@ -36,7 +43,8 @@ void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace
     //int cE[2] = {8, numLines};
     //mxArray * mxE = mxCreateNumericArray(2, cE, mxINT32_CLASS, mxREAL);
     //int * EndPoints = (int*)mxGetData(mxE); 
-    int * EndPoints =  (int*) malloc(sizeof(int)*8*numLines);
+    int * EndPoints =  new int[8*numLines]();//(int*) malloc(sizeof(int)*8*numLines);
+    printf("EndPoints[0]= %d\n",EndPoints[0]);
 //    printf("endpoints allocated\n");
     
 //    
@@ -81,7 +89,7 @@ void mexFunction(float * LinesData, int * SpaceSize, int numLines, int ** pSpace
 //        printf("\n");
 //    }
 //       printf("\n");
-    free(pSpace); // first pointer must be released
+//    free(pSpace); // first pointer must be released
 }
 
 void rasterize_lines(float * line, int * endpoints, int * space, int cSpaceSize, int numLines)

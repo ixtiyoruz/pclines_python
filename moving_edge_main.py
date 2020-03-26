@@ -53,7 +53,7 @@ def background_test(B, H, t1=11065969, t2=12065969):
     diff = abs(H - B)
 #    img = np.zeros((*np.shape(H), 3))
 #    min_val = np.min(H)
-    print(np.max(diff), np.min(diff))
+#    print(np.max(diff), np.min(diff))
     rws_t2,cols_t2,bins_t2 = np.where(diff < t2)
     rws_t1,cols_t1,bins_t1 = np.where(H<t1)
 #    rws_t3,cols_t3,bins_t3 = np.where()

@@ -43,6 +43,7 @@ def diamond_vanish(image,  Normalization, SpaceSize, VanishNumber,oldspace = [])
 #        if(i>250):
 #            image[i  , i,:] = [0,0,255]
 #            image[i  , 400-i-1,:] = [0,0,255]
+    
     result = {}#{'Space':[], 'PC_VanP':[],'PC_VanP_Norm':[],'CC_VanP':[]}
     result['PC_VanP'] = np.zeros([VanishNumber, 2])
     result["PC_VanP_Norm"] = np.zeros([VanishNumber, 2])
@@ -133,9 +134,9 @@ def diamond_vanish_with_lines(lines,width, height,  Normalization, SpaceSize, Va
             Results.PC_VanP_Norm  normalized position of the maxima (R.Space bounded from -1 to 1)
             Results.CC_VanP       position of the vanishing point in the input image coordinates
     """
-#    VanishNumber = 1
+#    VanishNumber = 3
 #    Normalization = 0.4
-#    SpaceSize = 321
+#    SpaceSize = 521
 #    width = 400
 #    height = 400
 #    image = np.zeros((400, 400,3), np.uint8);
@@ -147,42 +148,45 @@ def diamond_vanish_with_lines(lines,width, height,  Normalization, SpaceSize, Va
     result['PC_VanP'] = np.zeros([VanishNumber, 2])
     result["PC_VanP_Norm"] = np.zeros([VanishNumber, 2])
     result["CC_VanP"] = np.zeros([1, 2])
+#    lines[:, :2] = np.round(lines[:, :2],4)
 #    print(type(lines))
     lines[:,2] =lines[:,2]* Normalization
-    
-    subpixelradius = 2
-    threshold = 0.05
-    
-    
+#    lines = np.round(lines, 4)
+    subpixelradius = 8
+#    threshold = 0.05
 #    v = 0
-    for v in range(VanishNumber):
+#    for v in range(VanishNumber):
 #        print(np.shape(lines))
-        space = use_raster_space(lines.ravel(), [SpaceSize,SpaceSize],len(lines))
-        
-        space = np.reshape(space , (SpaceSize, SpaceSize)).T
-        if(len(space[0])>0 and len(oldspace) != 0):
-                space = space + oldspace
+    space = use_raster_space(lines.ravel(), [SpaceSize,SpaceSize],len(lines))
+    
+    space = np.reshape(space , (SpaceSize, SpaceSize)).T
+    if(len(space[0])>0 and len(oldspace) != 0):
+            space = space + oldspace
 #        print(np.shape(space))
-        if(v==0):
-            result["Space"] = space 
-        result['PC_VanP'][v,:] = find_maximum(space, subpixelradius)
-        
+#    if(v==0):
+    result["Space"] = space 
+    result['PC_VanP'][0,:] = find_maximum(space, subpixelradius)
+    
 #        result["Space"] = space
-        result["PC_VanP_Norm"][v,:] =  normalize_PC_points(result['PC_VanP'][v,:], SpaceSize)
-        
+    result["PC_VanP_Norm"][0,:] =  normalize_PC_points(result['PC_VanP'][0,:], SpaceSize)
+    
 #         get lines close to VP
 #         we are giving lines as n x 3 
 #        print(np.shape(lines))
-        distance = point_to_lines_dist(result["PC_VanP_Norm"][v,:], lines[:,0:3]) # shu method da xato bor 
+#    distance = point_to_lines_dist(result["PC_VanP_Norm"][0,:], lines[:,0:3]) # shu method da xato bor 
 #         remove lines
-        args= np.where(distance < threshold)[0]
+#    args= np.where(distance < threshold)[0]
 #        print('before lines shape = ', np.shape(lines), np.shape(args))
-         
-        lines = np.delete(lines, args, 0)
+     
+#    lines = np.delete(lines, args, 0)
 #        print('after lines shape = ', np.shape(lines), np.shape(args))
 #        
         
     result["CC_VanP"] = PC_point_to_CC(Normalization, result["PC_VanP_Norm"], [height,width ]) 
+    
+#
+#    cv2.imshow("img", np.uint8(space)*255);cv2.waitKey(0);
+#    cv2.destroyAllWindows()
 #    resvps = np.int32(abs(result["CC_VanP"]))-1
 #        print("detected vp =====", resvps)
 #    try:
@@ -280,10 +284,11 @@ def pad_with(vector, pad_width, iaxis, kwargs):
     vector[-pad_width[1]:] = pad_value        
 
 def find_maximum(space, R):
-    r,c = np.where(np.max(space) == space)
+    r,c = np.where(space==np.max(space) )
 #    print(r, c)
     S = np.pad(space, (R,R), pad_with, padder=0)
-    
+    r = r
+    c = c
     
     O = S[r[0]:r[0] + R*2+1, c[0]:c[0]+R*2+1]
     

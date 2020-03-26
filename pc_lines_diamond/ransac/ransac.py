@@ -8,10 +8,10 @@ def run_ransac(data, estimate, is_inlier, sample_size, goal_inliers, max_iterati
     data = list(data)
     for i in range(max_iterations):        
 #        print('len of data is ', len(data))
-        if(len(data) == 2):
-            s = data
-        else:
-            s = random.sample(data, int(sample_size))
+#        if(len(data) == 2):
+#            s = data
+#        else:
+        s = random.sample(data, int(sample_size))
         m = estimate(s)
         ic = 0
         for j in range(len(data)):
