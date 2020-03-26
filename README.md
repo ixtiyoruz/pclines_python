@@ -15,7 +15,7 @@ in order to run it, change path in main_using_pc_lines.py file and run :
 <pre>
 python main_using_pc_lines.py
 </pre>
-missing files in the folder:
+please put these files in the folder:
 <pre>
 ['yolo_cpp_dll.pdb',
  'yolo_cpp_dll.exp',
